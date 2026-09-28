@@ -9,20 +9,52 @@ on:
 jobs:
   svn-deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repository
+      - name: Checkout GitHub repository
         uses: actions/checkout@v4
 
-      - name: Setup SVN
-        run: sudo apt-get update && sudo apt-get install -y subversion
+      - name: Install SVN
+        run: sudo apt-get update && sudo apt-get install -y subversion rsync
 
-      - name: Deploy to WordPress SVN
+      - name: Deploy to WordPress.org SVN
         env:
           SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
           SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
         run: |
-          svn checkout https://plugins.svn.wordpress.org/productshift-backup-migration wp-svn --username "$SVN_USERNAME" --password "$SVN_PASSWORD" --non-interactive
-          rsync -av --exclude '.git' --exclude '.github' ./ wp-svn/trunk/
-          cd wp-svn
-          svn add --force trunk --username "$SVN_USERNAME" --password "$SVN_PASSWORD" --non-interactive || true
-          svn commit -m "Deploy ProductShift plugin update" --username "$SVN_USERNAME" --password "$SVN_PASSWORD" --non-interactive
+          VERSION="1.8.1"
+
+          svn checkout \
+            https://plugins.svn.wordpress.org/productshift-backup-migration \
+            /tmp/wp-svn \
+            --username "$SVN_USERNAME" \
+            --password "$SVN_PASSWORD" \
+            --non-interactive
+
+          mkdir -p /tmp/wp-svn/trunk
+          mkdir -p /tmp/wp-svn/tags/$VERSION
+
+          rsync -av --delete \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude 'wp-svn' \
+            ./ /tmp/wp-svn/trunk/
+
+          rsync -av --delete \
+            /tmp/wp-svn/trunk/ \
+            /tmp/wp-svn/tags/$VERSION/
+
+          cd /tmp/wp-svn
+
+          svn add --force trunk tags/$VERSION \
+            --username "$SVN_USERNAME" \
+            --password "$SVN_PASSWORD" \
+            --non-interactive || true
+
+          svn status | grep '^!' | awk '{print $2}' | xargs -r svn delete
+
+          svn commit \
+            -m "Release ProductShift 1.8.1" \
+            --username "$SVN_USERNAME" \
+            --password "$SVN_PASSWORD" \
+            --non-interactive
