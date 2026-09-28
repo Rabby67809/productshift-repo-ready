@@ -1,0 +1,28 @@
+name: Deploy WordPress Plugin to SVN
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  svn-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup SVN
+        run: sudo apt-get update && sudo apt-get install -y subversion
+
+      - name: Deploy to WordPress SVN
+        env:
+          SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
+          SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
+        run: |
+          svn checkout https://plugins.svn.wordpress.org/productshift-backup-migration wp-svn --username "$SVN_USERNAME" --password "$SVN_PASSWORD" --non-interactive
+          rsync -av --exclude '.git' --exclude '.github' ./ wp-svn/trunk/
+          cd wp-svn
+          svn add --force trunk --username "$SVN_USERNAME" --password "$SVN_PASSWORD" --non-interactive || true
+          svn commit -m "Deploy ProductShift plugin update" --username "$SVN_USERNAME" --password "$SVN_PASSWORD" --non-interactive
