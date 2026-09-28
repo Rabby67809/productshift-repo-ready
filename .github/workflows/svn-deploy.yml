@@ -33,20 +33,26 @@ jobs:
 
           mkdir -p /tmp/wp-svn/trunk
           mkdir -p /tmp/wp-svn/tags/$VERSION
+          mkdir -p /tmp/wp-svn/assets
 
           rsync -av --delete \
             --exclude '.git' \
             --exclude '.github' \
-            --exclude 'wp-svn' \
+            --exclude 'wordpress-org-assets' \
             ./ /tmp/wp-svn/trunk/
 
           rsync -av --delete \
             /tmp/wp-svn/trunk/ \
             /tmp/wp-svn/tags/$VERSION/
 
+          rsync -av --delete \
+            --exclude '.gitkeep' \
+            wordpress-org-assets/ \
+            /tmp/wp-svn/assets/
+
           cd /tmp/wp-svn
 
-          svn add --force trunk tags/$VERSION \
+          svn add --force trunk tags/$VERSION assets \
             --username "$SVN_USERNAME" \
             --password "$SVN_PASSWORD" \
             --non-interactive || true
@@ -54,7 +60,7 @@ jobs:
           svn status | grep '^!' | awk '{print $2}' | xargs -r svn delete
 
           svn commit \
-            -m "Release ProductShift 1.8.1" \
+            -m "Update ProductShift plugin assets and release files" \
             --username "$SVN_USERNAME" \
             --password "$SVN_PASSWORD" \
             --non-interactive
